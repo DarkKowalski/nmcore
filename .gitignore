@@ -1,0 +1,5 @@
+*.img
+*.out
+/dev-build
+/refind-bin
+/.vscode
