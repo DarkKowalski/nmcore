@@ -1,5 +1,5 @@
 *.img
 *.out
 /dev-build
-/refind-bin
+refind-bin
 /.vscode
