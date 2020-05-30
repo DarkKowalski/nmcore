@@ -56,10 +56,13 @@ if [[ $? -ne 0 ]]; then
 fi
 
 sudo mkdir -p ${BUILD_DIR}/dev-build/mnt/EFI/refind
+sudo mkdir -p ${BUILD_DIR}/dev-build/mnt/EFI/Boot
 # Target amd64
 sudo cp ${REFIND_BIN}/refind/refind_x64.efi ${BUILD_DIR}/dev-build/mnt/EFI/refind
 sudo cp ${REFIND_BIN}/refind/refind.conf-sample ${BUILD_DIR}/dev-build/mnt/EFI/refind/refind.conf
 sudo cp -r ${REFIND_BIN}/refind/icons ${BUILD_DIR}/dev-build/mnt/EFI/refind
+# rEFInd as default
+sudo cp ${REFIND_BIN}/refind/refind_x64.efi ${BUILD_DIR}/dev-build/mnt/EFI/Boot/bootx64.efi
 
 echo "[INFO]: Umount ESP"
 sudo umount /dev/loop0
