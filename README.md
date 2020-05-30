@@ -27,6 +27,8 @@ sys         Kernel sources.
 
 [Intel Programmer Manual](https://software.intel.com/content/www/us/en/develop/articles/intel-sdm.html)
 
+[UEFI Specification](https://uefi.org/specifications)
+
 ## Book
 
 [The Design and Implementation of the FreeBSD Operating System (2nd Edition)](https://www.amazon.com/Design-Implementation-FreeBSD-Operating-System/dp/0321968972)
