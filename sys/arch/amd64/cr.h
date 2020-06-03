@@ -93,7 +93,7 @@
 #define CR4_PKS      CR4_ENABLE_PROTECTION_KEYS_FOR_SUPERVISOR_MODE_PAGES
 
 /* CR8 */
-#define CR8_TASK_PRIORITY_LEVEL(level) (0x1111 & (level))
+#define CR8_TASK_PRIORITY_LEVEL(level) (0xF & (level))
 #define CR8_TPL(value)                 CR8_TASK_PRIORITY_LEVEL(value)
 
 #endif
