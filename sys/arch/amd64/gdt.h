@@ -13,12 +13,12 @@
 #include "segment_descriptor.h"
 
 /* Mark as Code or Data */
-#define DELARE_GDT_ENTRY(base, limit, flags, access)                           \
+#define DECLARE_GDT_ENTRY(base, limit, flags, access)                           \
   DECLARE_SEGMENT_DESCRIPTOR((base), (limit), (flags),                         \
                              ((access) | SEGDES_ACCESS_S))
 
 #define GDT_KERNEL_ENTRY                                                       \
-  DELARE_GDT_ENTRY(                                                            \
+  DECLARE_GDT_ENTRY(                                                            \
       0, 0,          /* Base, Limit*/                                          \
       SEGDES_FLAG_L, /* 64-bit segment */                                      \
       (SEGDES_ACCESS_P | SEGDES_ACCESS_DPL_RING0 |                             \
