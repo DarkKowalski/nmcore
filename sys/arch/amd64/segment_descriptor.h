@@ -69,7 +69,7 @@
   (((((base) >> 24) & 0xFF) << 56) | /* Base(24:31)*/                          \
    (((flags)&0xF) << 52) |           /* Flags */                               \
    ((((limit) >> 16) & 0xF) << 48) | /* Limit(16:19)*/                         \
-   (((access)&0xFF) << 40) |         /* Access Byte, set S */                  \
+   (((access)&0xFF) << 40) |         /* Access Byte */                  \
    (((base)&0xFFF) << 16) |          /* Base(0:23) */                          \
    ((limit)&0xFFFF)                  /* Limit(0:15) */                         \
   )
