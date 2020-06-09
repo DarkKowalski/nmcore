@@ -1,26 +1,12 @@
 #define ASM_FILE
+#include "../../sizes.h"
+#include "../../kernel.h"
 #include "../generic/multiboot2.h"
+#include "mmu.h"
+#include "gdt.h"
+#include "cr.h"
 
-/* 16KB stack size */
-#define STACK_SIZE 0x4000
-
-/* Framebuffer WxH=1024x768 Depth=32 */
-#define FRAMEBUFFER_WIDTH 1024
-#define FRAMEBUFFER_HEIGHT 768
-#define FRAMEBUFFER_DEPTH 32
-
-/* Get stack space ready */
-.section .bss
-stack_bottom:
-.skip STACK_SIZE
-stack_top:
-
-.section .text
-.global _start, start
-start:
-_start:
-    jmp multiboot_entry
-
+.section .multiboot
 /* Align 64 bits boundry */
 .align 8
 multiboot_header:
@@ -32,65 +18,110 @@ multiboot_header:
     .long multiboot_header_end - multiboot_header
     /* Checksum (u32) */
     .long -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT_ARCHITECTURE_I386 + (multiboot_header_end - multiboot_header))
-address_tag_start:
-    /* Type (u16) */
-    .short MULTIBOOT_HEADER_TAG_ADDRESS
-    /* Flags (u16) */
-    .short MULTIBOOT_HEADER_TAG_OPTIONAL
-    /* Size (u32) */
-    .long address_tag_end - address_tag_start
-    /* Header address (u32) */
-    .long multiboot_header
-    /* Load address (u32) */
-    .long _start
-    /* Load end address (u32) */
-    .long _edata
-    /* Bss end address (u32) */
-    .long _end
-address_tag_end:
-entry_address_tag_start:
-    /* Type (u16)*/
-    .short MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS
-    /* Flags (u16) */
-    .short MULTIBOOT_HEADER_TAG_OPTIONAL
-    /* Size (u32) */
-    .long entry_address_tag_end - entry_address_tag_start
-    /* Entry address (u32) */
-    .long multiboot_entry
-entry_address_tag_end:
-framebuffer_tag_start:
-    /* Type (u16) */
-    .short MULTIBOOT_HEADER_TAG_FRAMEBUFFER
-    /* Flags (u16) */
-    .short MULTIBOOT_HEADER_TAG_OPTIONAL
-    /* Size (u32) */
-    .long framebuffer_tag_end - framebuffer_tag_start
-    /* Width (u32) */
-    .long FRAMEBUFFER_WIDTH
-    /* Height (u32) */
-    .long FRAMEBUFFER_HEIGHT
-    /* Depth (u32) */
-    .long FRAMEBUFFER_DEPTH
-framebuffer_tag_end:
+
+.align 8
     /* Tags are terminate by a tag of type 0 and size 8 */
     .short MULTIBOOT_HEADER_TAG_END
     /* Flags cannot be OPTIONAL */
     .short 0
     .long 8
 multiboot_header_end:
+
+.code32
+.section .bss
+.comm pml4, PML4_SIZE, PML4_ALIGNMENT
+.comm low_pdpt, PDPT_SIZE, PDPT_ALIGNMENT
+.comm high_pdpt, PDPT_SIZE, PDPT_ALIGNMENT
+.comm low_page_directory_table, PAGE_DIRECTORY_SIZE, PAGE_DIRECTORY_ALIGNMENT
+.comm high_page_directory_table, PAGE_DIRECTORY_SIZE, PAGE_DIRECTORY_ALIGNMENT
+.comm tmp_stack, KERNEL_BOOT_STACK_SIZE, KERNEL_BOOT_STACK_ALIGNMENT
+
+.data
+.align GDT_TABLE_ALIGNMENT
+gdt_table:
+    .8byte GDT_FIRST_ENTRY
+    .8byte GDT_KERNEL_ENTRY
+gdt_table_end:
+    .skip (GDT_TABLE_SIZE - (gdt_table_end - gdt_table))
+gdt_ptr:
+    .short GDT_TABLE_SIZE - 1
+    .long  gdt_table
+
+.section .text
+.global _start
+.type _start, @function
+_start:
 multiboot_entry:
-    /* Set stack pointer */
-    movl $stack_top, %esp
+    /* Setup stack pointer */
+    movl $tmp_stack + KERNEL_BOOT_STACK_SIZE, %esp
 
-    /* Clear EFLAGS */
-    pushl $0
-    popf
+    /* Setup two PDPTs */
+    movl $low_pdpt, %eax
+    or $(MMU_PRESENT | MMU_WRITABLE), %eax
+    movl %eax, pml4 + (PML4_ADDR_TO_ENTRY_INDEX(KERNEL_PHYSICAL_START) * PML4_ENTRY_SIZE)
+    
+    movl $high_pdpt, %eax
+    or $(MMU_PRESENT | MMU_WRITABLE), %eax
+    movl %eax, pml4 + (PML4_ADDR_TO_ENTRY_INDEX(KERNEL_VIRTUAL_START) * PML4_ENTRY_SIZE)
 
-    /* Push the pointer to the Multiboot2 information structure */
-    pushl %ebx
-    /* Push Multiboot2 magic value */
-    pushl %eax
+    /* Setup two Page Directories */
+    movl $low_page_directory_table, %eax
+    or $(MMU_PRESENT | MMU_WRITABLE), %eax
+    movl %eax, low_pdpt + (PDPT_ADDR_TO_ENTRY_INDEX(KERNEL_PHYSICAL_START) * PDPT_ENTRY_SIZE)
 
+    movl $high_page_directory_table, %eax
+    or $(MMU_PRESENT | MMU_WRITABLE), %eax
+    movl %eax, high_pdpt + (PDPT_ADDR_TO_ENTRY_INDEX(KERNEL_VIRTUAL_START) * PDPT_ENTRY_SIZE)
+    
+    /* %ecx contains current entry being set  */
+    movl $0, %ecx
+    /* %esi contains the number of pages to be set */
+    movl $_kernel_physical_end, %esi
+    shrl $TWO_MEGABYTES_SHIFT, %esi
+    addl $1, %esi
+
+page_directory_table_loop:
+    movl $TWO_MEGABYTES, %eax
+    mul %ecx
+    or $(MMU_PRESENT | MMU_WRITABLE | MMU_PDE_TWO_MB), %eax
+    movl %eax, low_page_directory_table(, %ecx, PAGE_DIRECTORY_ENTRY_SIZE)
+    movl %eax, high_page_directory_table(, %ecx, PAGE_DIRECTORY_ENTRY_SIZE) 
+    inc %ecx
+    cmp %esi, %ecx
+    jne page_directory_table_loop
+
+    /* Setup CRs and EFER */
+    movl $pml4, %eax
+    movl %eax, %cr3
+    movl $KERNEL_CR4, %eax
+    movl %eax, %cr4
+    movl $MSR_EFER, %ecx
+    rdmsr
+    or $MSR_EFER_LME, %eax
+    wrmsr
+    movl $KERNEL_CR0, %eax
+    movl %eax, %cr0
+
+    /* Setup GDTR */
+    lgdt gdt_ptr
+    /* %cs, %eip */
+    ljmp $(KERNEL_GDT_ENTRY * GDT_ENTRY_SIZE), $_start64
+
+    cli
+    hlt
+
+.code64
+.global _start64
+_start64:
+
+    /* Setup segment selectors */
+    movw $0, %ax
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
+    movw %ax, %ss
+    
     /* Enter higher level kernel */
     call kernel_main
 
@@ -103,6 +134,4 @@ multiboot_entry:
 lock_up:
     hlt
     jmp lock_up
-
-
-
+_edata:
