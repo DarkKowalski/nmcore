@@ -1,10 +1,12 @@
 #define ASM_FILE
+
 #include "../../sizes.h"
 #include "../../kernel.h"
 #include "../generic/multiboot2.h"
 #include "mmu.h"
 #include "gdt.h"
 #include "cr.h"
+#include "msr.h"
 
 .section .multiboot
 /* Align 64 bits boundry */
@@ -112,6 +114,7 @@ page_directory_table_loop:
 
 .code64
 .global _start64
+.type _start64, @function
 _start64:
 
     /* Setup segment selectors */
