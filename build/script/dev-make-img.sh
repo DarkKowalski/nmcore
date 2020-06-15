@@ -15,13 +15,6 @@ else
   echo "[INFO]: PROJECT_ROOT=${PROJECT_ROOT}"
 fi
 
-if [[ -z "${REFIND_BIN}" ]]; then
-  echo "[ERROR]: REFIND_BIN is missing."
-  exit 1
-else
-  echo "[INFO]: REFIND_BIN=${REFIND_BIN}"
-fi
-
 mkdir -p ${BUILD_DIR}/dev-build/mnt
 
 echo "[INFO]: Create empty disk image(512MB):"
@@ -39,33 +32,46 @@ sudo sgdisk --clear --mbrtopgt ${BUILD_DIR}/dev-build/dev-nmcore.img
 sudo sgdisk --new 1:2048:4095 --change-name 1:"GRUB" --typecode 1:ef02 ${BUILD_DIR}/dev-build/dev-nmcore.img
 # 128M space for ESP
 sudo sgdisk --new 2:4096:266239 --change-name 2:"EFI" --typecode 2:ef00 --attributes "2:set:2" ${BUILD_DIR}/dev-build/dev-nmcore.img
+# Rest 380M for root path
+sudo sgdisk --new 3:266240:1044479 --change-name 3:"ROOT" --typecode 3:8300 --attributes "3:set:3" ${BUILD_DIR}/dev-build/dev-nmcore.img
 sudo sgdisk --print ${BUILD_DIR}/dev-build/dev-nmcore.img
 if [[ $? -ne 0 ]]; then
     echo "[ERROR]: Faild to initialize partitions."
     exit 1
 fi
 
-echo "[INFO]: Mount ESP to copy file"
-# Make filesystem then mount ESP, 4096 512-byte sectors = 2097152B, 128MB = 134217728B
-sudo losetup --offset 2097152 --sizelimit 134217728 /dev/loop0 ${BUILD_DIR}/dev-build/dev-nmcore.img
-sudo mkdosfs -F 32 /dev/loop0
-sudo mount /dev/loop0 ${BUILD_DIR}/dev-build/mnt
+sudo losetup /dev/loop0 -P ${BUILD_DIR}/dev-build/dev-nmcore.img
+echo "[INFO]: Mount ROOT"
+sudo mkfs.ext4 /dev/loop0p3
+sudo mount /dev/loop0p3 ${BUILD_DIR}/dev-build/mnt
+if [[ $? -ne 0 ]]; then
+    echo "[ERROR]: Faild to mount ROOT."
+    exit 1
+fi
+sudo mkdir -p ${BUILD_DIR}/dev-build/mnt/boot/grub
+sudo mkdir -p ${BUILD_DIR}/dev-build/mnt/efi
+
+echo "[INFO]: Mount ESP"
+sudo mkdosfs -F 32 /dev/loop0p2
+sudo mount /dev/loop0p2 ${BUILD_DIR}/dev-build/mnt/efi
 if [[ $? -ne 0 ]]; then
     echo "[ERROR]: Faild to mount ESP."
     exit 1
 fi
 
-sudo mkdir -p ${BUILD_DIR}/dev-build/mnt/EFI/refind
-sudo mkdir -p ${BUILD_DIR}/dev-build/mnt/EFI/Boot
-# Target amd64
-sudo cp ${REFIND_BIN}/refind/refind_x64.efi ${BUILD_DIR}/dev-build/mnt/EFI/refind
-sudo cp ${REFIND_BIN}/refind/refind.conf-sample ${BUILD_DIR}/dev-build/mnt/EFI/refind/refind.conf
-sudo cp -r ${REFIND_BIN}/refind/icons ${BUILD_DIR}/dev-build/mnt/EFI/refind
-# rEFInd as default
-sudo cp ${REFIND_BIN}/refind/refind_x64.efi ${BUILD_DIR}/dev-build/mnt/EFI/Boot/bootx64.efi
+# Install GRUB
+sudo grub-install --target=x86_64-efi \
+             --efi-directory=${BUILD_DIR}/dev-build/mnt/efi \
+             --root-directory=${BUILD_DIR}/dev-build/mnt \
+             --bootloader-id=GRUB --removable
+sudo cp ${PROJECT_ROOT}/build/config/grub.cfg ${BUILD_DIR}/dev-build/mnt/boot/grub/grub.cfg
 
-echo "[INFO]: Umount ESP"
-sudo umount /dev/loop0
+# Install Kernel
+sudo cp ${BUILD_DIR}/dev-build/dev-nmcore.bin ${BUILD_DIR}/dev-build/mnt/boot/dev-nmcore.bin
+
+echo "[INFO]: Umount BOOT and ESP"
+sudo umount /dev/loop0p2
+sudo umount /dev/loop0p3
 sudo losetup -d /dev/loop0
 rm -rf ${BUILD_DIR}/dev-build/mnt
 if [[ $? -eq 0 ]]; then
