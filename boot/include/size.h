@@ -1,7 +1,8 @@
 #ifndef BOOT_SIZE_H
 #define BOOT_SIZE_H
 
-#define SECTORS_TO_READ 31
+#define SETUP_SECTORS_TO_READ 4
+#define KERNEL_SECTORS_TO_READ 32
 #define BOOT_STACK_SIZE 0x1000
 
 #endif

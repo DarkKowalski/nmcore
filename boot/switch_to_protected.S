@@ -18,7 +18,7 @@ init_protected:
     mov %ax, %fs
     mov %ax, %gs
 
-    mov $0x90000, %ebp
+    mov $0x90000, %ebp // new stack
     mov %ebp, %esp
 
     call begin_protected

@@ -1,6 +1,7 @@
 #ifndef BOOT_OFFSET_H
 #define BOOT_OFFSET_H
 
+#define SETUP_OFFSET 0x7f00
 #define KERNEL_OFFSET 0x1000
 #define BOOT_STACK_OFFSET 0x9000
 

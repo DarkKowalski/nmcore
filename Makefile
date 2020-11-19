@@ -12,20 +12,20 @@ QEMU = qemu-system-x86_64
 
 run: bootsect.bin
 
+os-image.bin: bootsect.bin setup.bin
+	cat ./build/bootsect.bin ./build/setup.bin > ./build/os-image.bin
+
 bootsect.bin: builddir
-	${CC} ${CFLAGS} -Wl,-T ./boot/linker.ld -Wl,--oformat=binary -nostdlib -o ./build/bootsect.bin boot/bootsect.S
+	${CC} ${CFLAGS} -Wl,-T ./boot/bootsect.ld -Wl,--oformat=binary -nostdlib -o ./build/bootsect.bin boot/bootsect.S
+
+setup.bin: builddir
+	${CC} ${CFLAGS} -Wl,-T ./boot/setup.ld -Wl,--oformat=binary -nostdlib -o ./build/setup.bin boot/setup.S
 
 builddir:
 	mkdir -p ./build
 
-qemu: bootsect.bin
-	${QEMU} -fda ./build/bootsect.bin
-
-qemu-cli: bootsect.bin
-	${QEMU} -fda ./build/bootsect.bin -nographic
-
-disasm: bootsect.bin
-	${OBJDUMP} -b binary -m i386 -D ./build/bootsect.bin --adjust-vma 0x7c00
+qemu: os-image.bin
+	${QEMU} -fda ./build/os-image.bin
 
 clean:
 	rm -rfv ./build

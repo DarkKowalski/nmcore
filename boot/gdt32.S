@@ -8,15 +8,15 @@ gdt_code:
     .word 0xffff
     .word 0
     .byte 0
-    .byte 0x9a
-    .byte 0xcf
+    .byte 0b10011010
+    .byte 0b11001111
     .byte 0
 gdt_data:
     .word 0xffff
     .word 0
     .byte 0
-    .byte 0x92
-    .byte 0xcf
+    .byte 0b10010010
+    .byte 0b11001111
     .byte 0
 gdt_end:
 
