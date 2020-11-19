@@ -1,5 +1,8 @@
+.vscode
+.idea
+*.bin
 *.img
 *.out
-/dev-build
-refind-bin
-/.vscode
+*.o
+*.dump
+*build
